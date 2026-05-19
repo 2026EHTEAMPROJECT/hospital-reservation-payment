@@ -17,8 +17,8 @@ public class PaymentRequestConsumer {
 
     @RabbitListener(queues = RabbitConfig.PAYMENT_REQUEST_QUEUE)
     public void receive(PaymentRequestMessage message) {
-        log.info("[결제 요청 수신] reservationId={}, patientId={}, amount={}",
-                message.reservationId(), message.patientId(), message.amount());
+        log.info("[결제 요청 수신] reservationId={}, amount={}",
+                message.reservationId(), message.amount());
         paymentService.processPayment(message);
     }
 }

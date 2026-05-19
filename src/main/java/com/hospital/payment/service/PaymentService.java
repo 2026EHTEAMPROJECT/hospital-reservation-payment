@@ -1,13 +1,14 @@
 package com.hospital.payment.service;
 
-import com.hospital.payment.dto.PaymentNotificationMessage;
 import com.hospital.payment.dto.PaymentRequestMessage;
 import com.hospital.payment.dto.PaymentResponse;
 import com.hospital.payment.entity.Payment;
-import com.hospital.payment.publisher.PaymentNotificationPublisher;
+import com.hospital.payment.event.PaymentCreatedEvent;
 import com.hospital.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,24 +20,27 @@ import java.util.List;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
-    private final PaymentNotificationPublisher paymentNotificationPublisher;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void processPayment(PaymentRequestMessage request) {
         validate(request);
 
-        if (paymentRepository.existsByReservationId(request.reservationId())) {
+        Payment payment = simulatePayment(request);
+        Payment saved;
+        try {
+            saved = paymentRepository.saveAndFlush(payment);
+        } catch (DataIntegrityViolationException e) {
+            // DB unique 제약(uk_payment_reservation)으로 동시성/중복 차단 — 멱등 처리
             log.warn("[결제 중복 요청] reservationId={} 이미 결제된 예약", request.reservationId());
             return;
         }
 
-        Payment payment = simulatePayment(request);
-        Payment saved = paymentRepository.save(payment);
-
         log.info("[결제 처리 완료] paymentId={}, reservationId={}, status={}",
                 saved.getId(), saved.getReservationId(), saved.getStatus());
 
-        paymentNotificationPublisher.publish(new PaymentNotificationMessage(
+        // 트랜잭션 커밋 이후에만 알림을 발행하도록 이벤트 위임
+        eventPublisher.publishEvent(new PaymentCreatedEvent(
                 saved.getId(),
                 saved.getReservationId(),
                 saved.getPatientId(),
