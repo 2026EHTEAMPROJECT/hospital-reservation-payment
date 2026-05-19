@@ -5,7 +5,7 @@ spring:
   application:
     name: payment-service
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/hospital_payment?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/hospital_payment?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -18,9 +18,11 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
-    port: 5672
+    port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+  jackson:
+    default-property-inclusion: non_null
 
 management:
   endpoints:

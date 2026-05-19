@@ -6,7 +6,7 @@ services:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: hospital_payment
     ports:
-      - "3308:3306"
+      - "3306:3306"
     volumes:
       - payment-mysql-data:/var/lib/mysql
 
