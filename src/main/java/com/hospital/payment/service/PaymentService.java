@@ -7,6 +7,7 @@ import com.hospital.payment.event.PaymentCreatedEvent;
 import com.hospital.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
+
+    private static final String RESERVATION_UNIQUE_CONSTRAINT = "uk_payment_reservation";
 
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -31,9 +34,11 @@ public class PaymentService {
         try {
             saved = paymentRepository.saveAndFlush(payment);
         } catch (DataIntegrityViolationException e) {
-            // DB unique 제약(uk_payment_reservation)으로 동시성/중복 차단 — 멱등 처리
-            log.warn("[결제 중복 요청] reservationId={} 이미 결제된 예약", request.reservationId());
-            return;
+            if (isReservationDuplicate(e)) {
+                log.warn("[결제 중복 요청] reservationId={} 이미 결제된 예약", request.reservationId());
+                return;
+            }
+            throw e;
         }
 
         log.info("[결제 처리 완료] paymentId={}, reservationId={}, status={}",
@@ -66,6 +71,18 @@ public class PaymentService {
                 .stream()
                 .map(PaymentResponse::from)
                 .toList();
+    }
+
+    // uk_payment_reservation 제약 위반인 경우에만 멱등 처리, 그 외 무결성 오류는 전파
+    private boolean isReservationDuplicate(DataIntegrityViolationException e) {
+        Throwable cause = e.getMostSpecificCause();
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException cve) {
+                return RESERVATION_UNIQUE_CONSTRAINT.equalsIgnoreCase(cve.getConstraintName());
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     // 실제 PG사 연동을 가정한 시뮬레이션 (현재는 항상 성공)
