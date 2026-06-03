@@ -4,6 +4,7 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -24,14 +25,36 @@ public class RabbitConfig {
     public static final String PAYMENT_NOTIFICATION_QUEUE = "payment.notification.queue";
     public static final String PAYMENT_NOTIFICATION_ROUTING_KEY = "payment.notification";
 
+    // Dead-letter exchange / queue
+    public static final String DLX = "hospital.dlx";
+    public static final String PAYMENT_DLQ = "payment.request.dlq";
+
     @Bean
     public DirectExchange hospitalExchange() {
         return new DirectExchange(EXCHANGE, true, false);
     }
 
     @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(DLX, true, false);
+    }
+
+    @Bean
     public Queue paymentRequestQueue() {
-        return new Queue(PAYMENT_REQUEST_QUEUE, true);
+        return QueueBuilder.durable(PAYMENT_REQUEST_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLX)
+                .withArgument("x-dead-letter-routing-key", PAYMENT_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue paymentDeadLetterQueue() {
+        return QueueBuilder.durable(PAYMENT_DLQ).build();
+    }
+
+    @Bean
+    public Binding paymentDlqBinding(Queue paymentDeadLetterQueue, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(paymentDeadLetterQueue).to(deadLetterExchange).with(PAYMENT_DLQ);
     }
 
     @Bean
