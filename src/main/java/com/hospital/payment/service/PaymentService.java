@@ -8,6 +8,7 @@ import com.hospital.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -29,13 +30,20 @@ public class PaymentService {
     public void processPayment(PaymentRequestMessage request) {
         validate(request);
 
+        // 멱등성: 저장 전에 기존 결제 존재 여부를 먼저 확인
+        if (paymentRepository.findByReservationId(request.reservationId()).isPresent()) {
+            log.warn("[결제 중복 요청 - 멱등 종료] reservationId={} 이미 결제된 예약", request.reservationId());
+            return;
+        }
+
         Payment payment = simulatePayment(request);
         Payment saved;
         try {
             saved = paymentRepository.saveAndFlush(payment);
         } catch (DataIntegrityViolationException e) {
+            // race condition backstop: 동시 요청이 유니크 제약을 위반한 경우
             if (isReservationDuplicate(e)) {
-                log.warn("[결제 중복 요청] reservationId={} 이미 결제된 예약", request.reservationId());
+                log.warn("[결제 중복 요청 - race backstop] reservationId={} 이미 결제된 예약", request.reservationId());
                 return;
             }
             throw e;
@@ -93,16 +101,16 @@ public class PaymentService {
 
     private void validate(PaymentRequestMessage request) {
         if (request == null) {
-            throw new IllegalArgumentException("결제 요청 메시지는 null일 수 없습니다.");
+            throw new AmqpRejectAndDontRequeueException("결제 요청 메시지는 null일 수 없습니다.");
         }
         if (request.reservationId() == null) {
-            throw new IllegalArgumentException("reservationId는 null일 수 없습니다.");
+            throw new AmqpRejectAndDontRequeueException("reservationId는 null일 수 없습니다.");
         }
         if (request.patientId() == null) {
-            throw new IllegalArgumentException("patientId는 null일 수 없습니다.");
+            throw new AmqpRejectAndDontRequeueException("patientId는 null일 수 없습니다.");
         }
         if (request.amount() == null || request.amount() < 0) {
-            throw new IllegalArgumentException("amount는 0 이상이어야 합니다.");
+            throw new AmqpRejectAndDontRequeueException("amount는 0 이상이어야 합니다.");
         }
     }
 }
