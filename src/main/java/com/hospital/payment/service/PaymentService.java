@@ -22,6 +22,7 @@ import java.util.List;
 public class PaymentService {
 
     private static final String RESERVATION_UNIQUE_CONSTRAINT = "uk_payment_reservation";
+    private static final String DEFAULT_PATIENT_NAME = "환자";
 
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -95,7 +96,7 @@ public class PaymentService {
 
     // 실제 PG사 연동을 가정한 시뮬레이션 (현재는 항상 성공)
     private Payment simulatePayment(PaymentRequestMessage request) {
-        String name = request.patientName() != null ? request.patientName() : "환자";
+        String name = request.patientName() != null ? request.patientName() : DEFAULT_PATIENT_NAME;
         return Payment.success(request.reservationId(), request.patientId(), name, request.amount());
     }
 
