@@ -25,4 +25,16 @@ public class PaymentEventListener {
                 event.patientName()
         ));
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPaymentRefunded(PaymentRefundedEvent event) {
+        paymentNotificationPublisher.publish(new PaymentNotificationMessage(
+                event.paymentId(),
+                event.reservationId(),
+                event.patientId(),
+                "REFUNDED",
+                event.amount(),
+                event.patientName()
+        ));
+    }
 }
