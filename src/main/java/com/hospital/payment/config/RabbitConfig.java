@@ -21,6 +21,10 @@ public class RabbitConfig {
     public static final String PAYMENT_REQUEST_QUEUE = "booking.payment.queue";
     private static final String PAYMENT_REQUEST_ROUTING_KEY = "booking.payment";
 
+    // booking-service(예약취소) -> payment-service(환불)
+    public static final String PAYMENT_REFUND_QUEUE = "payment.refund.queue";
+    private static final String PAYMENT_REFUND_ROUTING_KEY = "payment.refund";
+
     // payment-service -> notification-service
     public static final String PAYMENT_NOTIFICATION_QUEUE = "payment.notification.queue";
     public static final String PAYMENT_NOTIFICATION_ROUTING_KEY = "payment.notification";
@@ -65,6 +69,19 @@ public class RabbitConfig {
     @Bean
     public Binding paymentRequestBinding(Queue paymentRequestQueue, DirectExchange hospitalExchange) {
         return BindingBuilder.bind(paymentRequestQueue).to(hospitalExchange).with(PAYMENT_REQUEST_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue paymentRefundQueue() {
+        return QueueBuilder.durable(PAYMENT_REFUND_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLX)
+                .withArgument("x-dead-letter-routing-key", PAYMENT_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Binding paymentRefundBinding(Queue paymentRefundQueue, DirectExchange hospitalExchange) {
+        return BindingBuilder.bind(paymentRefundQueue).to(hospitalExchange).with(PAYMENT_REFUND_ROUTING_KEY);
     }
 
     @Bean

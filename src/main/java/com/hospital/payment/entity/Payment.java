@@ -53,11 +53,28 @@ public class Payment {
         this.status = status;
     }
 
+    public static final String STATUS_SUCCESS = "SUCCESS";
+    public static final String STATUS_FAILED = "FAILED";
+    public static final String STATUS_REFUNDED = "REFUNDED";
+
     public static Payment success(Long reservationId, Long patientId, String patientName, Integer amount) {
-        return new Payment(reservationId, patientId, patientName, amount, "SUCCESS");
+        return new Payment(reservationId, patientId, patientName, amount, STATUS_SUCCESS);
     }
 
     public static Payment failed(Long reservationId, Long patientId, String patientName, Integer amount) {
-        return new Payment(reservationId, patientId, patientName, amount, "FAILED");
+        return new Payment(reservationId, patientId, patientName, amount, STATUS_FAILED);
+    }
+
+    public boolean isSuccess() {
+        return STATUS_SUCCESS.equals(this.status);
+    }
+
+    public boolean isRefunded() {
+        return STATUS_REFUNDED.equals(this.status);
+    }
+
+    // 결제를 환불 상태로 전환한다(이미 환불된 경우 호출하지 않는다 — 멱등 처리는 서비스에서).
+    public void markRefunded() {
+        this.status = STATUS_REFUNDED;
     }
 }

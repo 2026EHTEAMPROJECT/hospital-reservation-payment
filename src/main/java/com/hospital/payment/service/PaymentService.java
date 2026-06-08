@@ -2,8 +2,10 @@ package com.hospital.payment.service;
 
 import com.hospital.payment.dto.PaymentRequestMessage;
 import com.hospital.payment.dto.PaymentResponse;
+import com.hospital.payment.dto.RefundRequestMessage;
 import com.hospital.payment.entity.Payment;
 import com.hospital.payment.event.PaymentCreatedEvent;
+import com.hospital.payment.event.PaymentRefundedEvent;
 import com.hospital.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +61,46 @@ public class PaymentService {
                 saved.getReservationId(),
                 saved.getPatientId(),
                 saved.getStatus(),
+                saved.getAmount(),
+                saved.getPatientName()
+        ));
+    }
+
+    @Transactional
+    public void processRefund(RefundRequestMessage request) {
+        if (request == null || request.reservationId() == null) {
+            throw new AmqpRejectAndDontRequeueException("환불 요청 메시지가 올바르지 않습니다.");
+        }
+
+        Payment payment = paymentRepository.findByReservationId(request.reservationId()).orElse(null);
+        if (payment == null) {
+            log.warn("[환불 무시] reservationId={} 결제내역 없음", request.reservationId());
+            return;
+        }
+
+        // 멱등성: 이미 환불된 결제는 다시 처리하지 않는다.
+        if (payment.isRefunded()) {
+            log.warn("[환불 멱등 종료] reservationId={} 이미 환불됨", request.reservationId());
+            return;
+        }
+
+        // 성공한 결제만 환불 가능(실패 결제는 환불 대상 아님).
+        if (!payment.isSuccess()) {
+            log.warn("[환불 불가] reservationId={} status={}", request.reservationId(), payment.getStatus());
+            return;
+        }
+
+        payment.markRefunded();
+        Payment saved = paymentRepository.saveAndFlush(payment);
+
+        log.info("[환불 처리 완료] paymentId={}, reservationId={}, amount={}",
+                saved.getId(), saved.getReservationId(), saved.getAmount());
+
+        // 트랜잭션 커밋 이후에만 환불완료 알림을 발행하도록 이벤트 위임
+        eventPublisher.publishEvent(new PaymentRefundedEvent(
+                saved.getId(),
+                saved.getReservationId(),
+                saved.getPatientId(),
                 saved.getAmount(),
                 saved.getPatientName()
         ));
