@@ -57,6 +57,10 @@ public class Payment {
     public static final String STATUS_FAILED = "FAILED";
     public static final String STATUS_REFUNDED = "REFUNDED";
 
+    public static final String LABEL_SUCCESS = "결제완료";
+    public static final String LABEL_FAILED = "결제실패";
+    public static final String LABEL_REFUNDED = "환불됨";
+
     public static Payment success(Long reservationId, Long patientId, String patientName, Integer amount) {
         return new Payment(reservationId, patientId, patientName, amount, STATUS_SUCCESS);
     }
@@ -71,6 +75,17 @@ public class Payment {
 
     public boolean isRefunded() {
         return STATUS_REFUNDED.equals(this.status);
+    }
+
+    // 상태 코드값에 대응하는 한국어 표시 라벨을 반환한다.
+    // 프론트/관리자가 별도 매핑 없이 그대로 노출할 수 있도록 응답에 함께 내려준다.
+    public String getStatusLabel() {
+        return switch (this.status) {
+            case STATUS_SUCCESS -> LABEL_SUCCESS;
+            case STATUS_FAILED -> LABEL_FAILED;
+            case STATUS_REFUNDED -> LABEL_REFUNDED;
+            default -> this.status;
+        };
     }
 
     // 결제를 환불 상태로 전환한다(이미 환불된 경우 호출하지 않는다 — 멱등 처리는 서비스에서).
