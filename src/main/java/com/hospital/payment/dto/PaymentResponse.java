@@ -10,6 +10,7 @@ public record PaymentResponse(
         Long patientId,
         Integer amount,
         String status,
+        String statusLabel,
         LocalDateTime createdAt
 ) {
     public static PaymentResponse from(Payment payment) {
@@ -19,6 +20,7 @@ public record PaymentResponse(
                 payment.getPatientId(),
                 payment.getAmount(),
                 payment.getStatus(),
+                payment.getStatusLabel(),
                 payment.getCreatedAt()
         );
     }
