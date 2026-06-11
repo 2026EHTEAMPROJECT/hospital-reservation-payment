@@ -63,7 +63,14 @@ public class RabbitConfig {
 
     @Bean
     public Queue paymentNotificationQueue() {
-        return new Queue(PAYMENT_NOTIFICATION_QUEUE, true);
+        // 라이브 큐(notification-service 가 먼저 선언)가 DLX 인자를 갖고 있어, 인자 없이
+        // 선언하면 PRECONDITION_FAILED(406)로 채널이 닫혀 기동에 실패한다. notification 의
+        // 동일 큐 선언과 인자를 일치시킨다(x-dead-letter-exchange=hospital.dlx,
+        // x-dead-letter-routing-key=payment.notification.dlq).
+        return QueueBuilder.durable(PAYMENT_NOTIFICATION_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLX)
+                .withArgument("x-dead-letter-routing-key", "payment.notification.dlq")
+                .build();
     }
 
     @Bean
